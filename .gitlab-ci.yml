@@ -1,0 +1,35 @@
+image: "python:3.6-slim-stretch"
+
+variables:
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache"
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+before_script:
+  - apt-get update -qq
+  - apt-get install -y -qq shellcheck qemu-system-x86 git
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+  - pip install flake8 pytest-cov python-coveralls
+
+wiki:
+  script:
+    - test/check_devices_in_wiki.py
+
+static-analysis:
+  script:
+    - test/static_code_analysis.sh
+
+build:
+  script:
+  # Workaround since gitlab.com CI doesn't allow running as
+  # user other than root
+  - useradd pmos -m -s /bin/bash
+  - chown -R pmos:pmos .
+  - su pmos -l -c "cd $CI_PROJECT_DIR && yes ''| $CI_PROJECT_DIR/pmbootstrap.py init"
+  - su pmos -l -c "cd $CI_PROJECT_DIR && $CI_PROJECT_DIR/pmbootstrap.py kconfig_check"
+  - su pmos -l -c "cd $CI_PROJECT_DIR && $CI_PROJECT_DIR/test/check_checksums.py --build"
